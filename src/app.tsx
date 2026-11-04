@@ -1,4 +1,6 @@
 import { Hono } from 'hono';
+import { readNight } from './digest/reader.js';
+import { DigestPage, NoDigest } from './views/digest.js';
 import { loadConfig, type RigConfig } from './config.js';
 import { lane } from './lane.js';
 import { readStatus } from './status.js';
@@ -17,6 +19,24 @@ export function createApp(config: RigConfig = loadConfig()) {
       </Layout>,
     ),
   );
+
+  app.get('/digest/:night', (c) => {
+    const id = c.req.param('night');
+    const night = readNight(config.runsDir, id);
+    if (!night) {
+      return c.html(
+        <Layout title={`digest · ${id}`} lane={lane()}>
+          <NoDigest night={id} />
+        </Layout>,
+        404,
+      );
+    }
+    return c.html(
+      <Layout title={`digest · ${id}`} lane={lane()}>
+        <DigestPage night={night} />
+      </Layout>,
+    );
+  });
 
   return app;
 }
