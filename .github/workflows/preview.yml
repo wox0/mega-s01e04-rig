@@ -1,0 +1,57 @@
+# Plan morning-digest § 3 and § 4 (ADR 0003): publish the digest preview to GitHub Pages.
+# The page is rendered here, in CI, and deployed as a Pages artifact: it is never committed.
+# Run by hand only. marker=with uses the repo variable LANE_MARKER; marker=without leaves it
+# unset, so the banner reads "no marker set". Each run uploads over the same link.
+name: preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      marker:
+        description: 'Lane marker on the page: with | without'
+        required: true
+        default: 'without'
+        type: choice
+        options: [with, without]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+      - name: Write .env
+        env:
+          WITH_MARKER: ${{ inputs.marker == 'with' }}
+          LANE_MARKER_VALUE: ${{ vars.LANE_MARKER }}
+        run: |
+          cp .env.example .env
+          if [ "$WITH_MARKER" = "true" ]; then
+            sed -i "s/^LANE_MARKER=.*/LANE_MARKER=${LANE_MARKER_VALUE}/" .env
+          fi
+      - name: Save /digest/2026-10-28 as one HTML file
+        run: pnpm preview:save
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: var/preview
+          retention-days: 1
+      - id: deployment
+        uses: actions/deploy-pages@v4
