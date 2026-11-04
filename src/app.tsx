@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
-import { readNight } from './digest/reader.js';
-import { DigestPage, NoDigest } from './views/digest.js';
 import { loadConfig, type RigConfig } from './config.js';
+import { readNight } from './digest/reader.js';
 import { lane } from './lane.js';
 import { readStatus } from './status.js';
+import { DigestPage, NoDigest } from './views/digest.js';
 import { Layout } from './views/layout.js';
 import { StatusBoard } from './views/status.js';
 
@@ -20,6 +20,7 @@ export function createApp(config: RigConfig = loadConfig()) {
     ),
   );
 
+  // Page and JSON read the same rows from the same call, so they never disagree (ADR 0001).
   app.get('/digest/:night', (c) => {
     const id = c.req.param('night');
     const night = readNight(config.runsDir, id);
@@ -36,6 +37,13 @@ export function createApp(config: RigConfig = loadConfig()) {
         <DigestPage night={night} />
       </Layout>,
     );
+  });
+
+  app.get('/api/digest/:night', (c) => {
+    const id = c.req.param('night');
+    const night = readNight(config.runsDir, id);
+    if (!night) return c.json({ error: `no run log for ${id}` }, 404);
+    return c.json(night);
   });
 
   return app;
